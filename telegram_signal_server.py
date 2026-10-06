@@ -12,26 +12,21 @@ TELEGRAM_CHAT_ID   = os.environ.get("TELEGRAM_CHAT_ID", "YOUR_TELEGRAM_CHAT_ID_H
 GEMINI_API_KEY     = os.environ.get("GEMINI_API_KEY", "")
 QWEN_API_KEY       = os.environ.get("Qwen_Cloud_API_KEY", os.environ.get("QWEN_API_KEY", ""))
 
-def format_telegram_alert(raw_text):
-    """TradingView alert-কে সুন্দর বক্সড ও হাইলাইটেড ফরম্যাটে সাজায়"""
+def format_clean_signal(raw_text):
+    """২য় ইমেজের মতো ১০০% ক্লিন ও বোল্ড সিগন্যাল (কোনো TRADINGVIEW SMC ALERT নেই)"""
     if "|" not in raw_text:
-        return f"🔔 <b>TRADINGVIEW SMC ALERT</b> 🔔\n\n{raw_text}"
+        return raw_text
     
     parts = [p.strip() for p in raw_text.split("|")]
     header = parts[0]
     
     is_buy = "BUY" in header.upper()
-    is_sell = "SELL" in header.upper()
     is_aplus = "A+" in header.upper()
     
-    ticker = "XAUUSD"
     entry = "-"
     if "@" in header:
-        h_split = header.split("@")
-        entry = h_split[1].strip()
-        if " on " in h_split[0]:
-            ticker = h_split[0].split(" on ")[1].strip()
-            
+        entry = header.split("@")[1].strip()
+        
     sl = tp1 = tp2 = retest = "-"
     for p in parts[1:]:
         if p.startswith("SL:"):
@@ -42,32 +37,100 @@ def format_telegram_alert(raw_text):
             tp2 = p.replace("TP2:", "").strip()
         elif p.startswith("Retest:"):
             retest = p.replace("Retest:", "").strip()
-            
-    title_emoji = "🏆" if is_aplus else "⚖️"
-    dir_emoji = "🟢" if is_buy else "🔴"
-    action_text = "CONFIRMED BUY NOW 🚀" if is_buy else "CONFIRMED SELL NOW 📉"
-    grade_text = "A+ GRADE SETUP (High Win Probability)" if is_aplus else "B+ GRADE SETUP (Standard Setup)"
-    border = "━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    # Calculate TP3 (1:5.0)
+    tp3 = "-"
+    try:
+        e_f = float(entry)
+        s_f = float(sl)
+        risk_f = abs(e_f - s_f)
+        if is_buy:
+            tp3 = f"{e_f + risk_f * 5.0:.2f}"
+        else:
+            tp3 = f"{e_f - risk_f * 5.0:.2f}"
+    except:
+        pass
+
+    sig_icon = "🏆" if is_buy else "🔻"
+    action_text = "BUY NOW" if is_buy else "SELL NOW"
+    grade_text = "A+" if is_aplus else "B+"
+    
+    title_str = f"{grade_text} CONFIRMED {action_text}"
+    div = "─────────────────────────────"
+    retest_line = f"🔄 <b>Retest Zone: {retest}</b>\n" if retest != "-" else ""
     
     msg = (
-        f"{border}\n"
-        f"{title_emoji} <b>{grade_text}</b>\n"
-        f"{dir_emoji} <b>ACTION: {action_text}</b>\n"
-        f"{border}\n\n"
-        f"📊 <b>Asset:</b> <code>{ticker}</code>\n"
-        f"🎯 <b>Entry Price:</b> <code>{entry}</code>\n"
-        f"🔄 <b>Retest Zone:</b> <code>{retest}</code>\n\n"
-        f"🛑 <b>Stop Loss:</b> <code>{sl}</code>\n"
-        f"🚀 <b>Take Profit 1:</b> <code>{tp1}</code> (1:2.0 • Lock BE)\n"
-        f"🔥 <b>Take Profit 2:</b> <code>{tp2}</code> (1:3.5 • Runner Target)\n\n"
-        f"{border}\n"
-        f"🛡️ <i>Strategy: Smart Money Concepts (ICT)</i>\n"
-        f"⚡ <i>Risk Management: Follow Strict SL & Move to BE at TP1</i>"
+        f"<b>{sig_icon} {title_str}</b>\n"
+        f"<b>Asset: XAUUSD (GOLD)</b>\n"
+        f"{div}\n"
+        f"🎯 <b>Entry: {entry}</b>\n"
+        f"{retest_line}\n"
+        f"🛑 <b>Stop Loss: {sl}</b>\n\n"
+        f"🚀 <b>Take Profit 1: {tp1} (1:2.0)</b>\n"
+        f"🚀 <b>Take Profit 2: {tp2} (1:3.5)</b>\n"
+        f"🚀 <b>Take Profit 3: {tp3} (1:5.0)</b>\n"
+        f"{div}"
     )
     return msg
 
+def analyze_with_ai(signal_text):
+    """See More ক্লিক করলে বাংলায় শর্ট প্রাতিষ্ঠানিক ব্যাখ্যা খুলবে"""
+    prompt = (
+        f"Act as an elite SMC/ICT institutional trader. "
+        f"In Bengali (বাংলায়), giving all trading terms in English "
+        f"(e.g., Order Block, Liquidity Sweep, FVG, Break-Even, Retest Zone, Stop Loss, Take Profit, CHoCH, Displacement), "
+        f"provide 2 or 3 short sharp bullet points under 45 words explaining institutional rationale and execution.\n\n"
+        f"Signal Data: {signal_text}"
+    )
+
+    empty = '\u2800'
+    if QWEN_API_KEY:
+        endpoints = [
+            "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions",
+            "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+        ]
+        payload = {
+            "model": "qwen-plus",
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 120
+        }
+        data = json.dumps(payload).encode('utf-8')
+        headers = {"Content-Type": "application/json", "Authorization": f"Bearer {QWEN_API_KEY}"}
+        for url in endpoints:
+            try:
+                req = urllib.request.Request(url, data=data, headers=headers)
+                with urllib.request.urlopen(req, timeout=4) as resp:
+                    res_json = json.loads(resp.read().decode('utf-8'))
+                    ai_text = res_json['choices'][0]['message']['content'].strip()
+                    return (
+                        f"\n<blockquote expandable>🔍 <b>See More — AI Trade Analysis</b>\n"
+                        f"{empty}\n{empty}\n"
+                        f"🧠 <b>Institutional Analysis:</b>\n{ai_text}</blockquote>"
+                    )
+            except:
+                continue
+
+    if GEMINI_API_KEY:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+            payload = {"contents": [{"parts": [{"text": prompt}]}]}
+            data = json.dumps(payload).encode('utf-8')
+            req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                res_json = json.loads(resp.read().decode('utf-8'))
+                ai_text = res_json['candidates'][0]['content']['parts'][0]['text'].strip()
+                return (
+                    f"\n<blockquote expandable>🔍 <b>See More — AI Trade Analysis</b>\n"
+                    f"{empty}\n{empty}\n"
+                    f"🧠 <b>Institutional Analysis:</b>\n{ai_text}</blockquote>"
+                )
+        except:
+            pass
+
+    return ""
+
 def send_telegram_message(text):
-    """টেলিগ্রাম বট API-এর মাধ্যমে সরাসরি মেসেজ পাঠায় (আপনার ও ফ্রেন্ডের উভয় আইডিতে যাবে)"""
+    """টেলিগ্রাম বট API-এর মাধ্যমে সরাসরি মেসেজ পাঠায়"""
     if not TELEGRAM_BOT_TOKEN or TELEGRAM_BOT_TOKEN == "YOUR_TELEGRAM_BOT_TOKEN_HERE":
         print("[ERROR] Telegram Bot Token set kora hoyni!")
         return False
@@ -97,50 +160,6 @@ def send_telegram_message(text):
 
     return any_success
 
-def analyze_with_qwen(signal_text):
-    if not QWEN_API_KEY:
-        return ""
-    endpoints = [
-        "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions",
-        "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
-    ]
-    prompt = (f"Act as an elite ICT/SMC institutional trader. In 2 short bullet points, give a sharp execution tip "
-              f"for this Gold (XAUUSD) signal:\n{signal_text}\nKeep it under 35 words. Be precise.")
-    payload = {
-        "model": "qwen-plus",
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 100
-    }
-    data = json.dumps(payload).encode('utf-8')
-    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {QWEN_API_KEY}"}
-    for url in endpoints:
-        try:
-            req = urllib.request.Request(url, data=data, headers=headers)
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                res_json = json.loads(resp.read().decode('utf-8'))
-                ai_text = res_json['choices'][0]['message']['content']
-                return f"\n\n🤖 <b>Qwen AI Tip:</b>\n<i>{ai_text.strip()}</i>"
-        except:
-            continue
-    return ""
-
-def analyze_with_gemini(signal_text):
-    if not GEMINI_API_KEY:
-        return ""
-    try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-        prompt = (f"Act as an elite ICT/SMC institutional trader. In 2 short bullet points, give a sharp execution tip "
-                  f"for this Gold (XAUUSD) signal:\n{signal_text}\nKeep it under 35 words. Be precise.")
-        payload = {"contents": [{"parts": [{"text": prompt}]}]}
-        data = json.dumps(payload).encode('utf-8')
-        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            res_json = json.loads(resp.read().decode('utf-8'))
-            ai_text = res_json['candidates'][0]['content']['parts'][0]['text']
-            return f"\n\n🤖 <b>Gemini AI Tip:</b>\n<i>{ai_text.strip()}</i>"
-    except:
-        return ""
-
 class WebhookHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         content_length = int(self.headers.get('Content-Length', 0))
@@ -159,14 +178,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
         except:
             message_to_send = raw_body
 
-        formatted_signal = format_telegram_alert(message_to_send)
+        clean_table = format_clean_signal(message_to_send)
+        ai_block = analyze_with_ai(message_to_send)
 
-        ai_insight = analyze_with_qwen(message_to_send)
-        if not ai_insight:
-            ai_insight = analyze_with_gemini(message_to_send)
-
-        final_tg_msg = formatted_signal + ai_insight
-
+        final_tg_msg = clean_table + ai_block
         success = send_telegram_message(final_tg_msg)
 
         self.send_response(200 if success else 500)
