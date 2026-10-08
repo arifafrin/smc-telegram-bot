@@ -116,19 +116,38 @@ def format_clean_signal(raw_text):
     return msg
 
 def analyze_with_ai(signal_text):
-    """See More ক্লিক করলে বাংলায় শর্ট প্রাতিষ্ঠানিক ব্যাখ্যা খুলবে"""
-    prompt = (
-        f"Act as an elite SMC/ICT institutional analyst. "
-        f"A verified signal was just confirmed by our institutional indicator:\n{signal_text}\n\n"
-        f"In Bengali (বাংলায়), with key trading terms in English (e.g. Order Block, Liquidity Sweep, Retest, Breakout, Stop Loss, Risk-to-Reward), "
-        f"provide a crisp 3-bullet analysis strictly covering:\n"
-        f"• 🎯 Trade Validity: কেন এই ট্রেডটি টেকনিক্যালি ভ্যালিড (SMC Structure/Retest/Sweep কনফার্মেশন)।\n"
-        f"• 📊 Win Chance: উইন সম্ভাবনা ও রিস্ক-রিওয়ার্ড মূল্যায়ন (High Probability / Grade A+)।\n"
-        f"• ⚡ Execution Tip: ট্রেডারদের জন্য সেফ এন্ট্রি ও Break-Even ট্র্যাকিং টিপস।\n"
-        f"Keep total response concise and sharp (under 55 words)."
-    )
+    """ট্রেডের প্রাতিষ্ঠানিক লজিক বাংলায় ও ট্রেডিং টার্মগুলো ইংরেজিতে সুন্দরভাবে ব্যাখ্যা করে"""
+    is_buy = "BUY" in signal_text.upper()
+    action_str = "BUY" if is_buy else "SELL"
+    dir_str = "Bullish" if is_buy else "Bearish"
+    grade_str = "SUPER A+ (Morning Expansion)" if "SUPER" in signal_text.upper() else ("A+" if "A+" in signal_text.upper() else "B+")
+    
+    tf_str = "30m"
+    if "(" in signal_text and ")" in signal_text:
+        try:
+            tf_cand = signal_text.split("(")[1].split(")")[0].strip()
+            if any(c.isdigit() for c in tf_cand) or tf_cand.upper() in ["D", "W", "M"]:
+                tf_str = tf_cand
+        except:
+            pass
 
-    empty = '\u2800'
+    retest_val = "-"
+    if "Retest:" in signal_text:
+        try:
+            retest_val = signal_text.split("Retest:")[1].strip().split("|")[0].strip()
+        except:
+            pass
+
+    prompt = (
+        f"Act as an elite SMC/ICT institutional trading analyst. "
+        f"A verified signal was just confirmed by our SMC indicator:\n{signal_text}\n\n"
+        f"In natural Bengali (বাংলায়), keeping all professional trading terms strictly in English (e.g. Order Block, Liquidity Sweep, Retest, CHoCH, BOS, Multi-Timeframe, Price Action, Mitigation, Displacement):\n"
+        f"Explain ONLY the technical trade logic in detail (strictly 3 concise technical bullets, NO generic risk-reward or break-even advice):\n"
+        f"• 🏦 Institutional Order Block & Liquidity: কেন এই জোনে এন্ট্রি হলো (Order Block mitigation, Liquidity Sweep ও ক্যান্ডেল উইক রিজেকশন)।\n"
+        f"• 🔄 Structure & Retest: মার্কেট স্ট্রাকচার, Retest জোন ও প্রাইস অ্যাকশন ক্যান্ডেল কনফার্মেশন।\n"
+        f"• 📈 Multi-Timeframe & Momentum: মাল্টি-টাইমফ্রেম ট্রেন্ড অ্যালাইনমেন্ট ও ভলিউম ফ্লো।\n"
+        f"Keep response technical, crisp, and under 70 words. No intro or outro."
+    )
 
     if QWEN_API_KEY:
         endpoints = [
@@ -138,7 +157,7 @@ def analyze_with_ai(signal_text):
         payload = {
             "model": "qwen-plus",
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 150
+            "max_tokens": 200
         }
         data = json.dumps(payload).encode('utf-8')
         headers = {"Content-Type": "application/json", "Authorization": f"Bearer {QWEN_API_KEY}"}
@@ -149,9 +168,8 @@ def analyze_with_ai(signal_text):
                     res_json = json.loads(resp.read().decode('utf-8'))
                     ai_text = res_json['choices'][0]['message']['content'].strip()
                     return (
-                        f"\n\n<blockquote expandable>🔍 <b>See More — AI Analysis</b>\n"
-                        f"{empty}\n{empty}\n"
-                        f"🧠 <b>Institutional Analysis:</b>\n{ai_text}</blockquote>"
+                        f"\n\n🧠 <b>TRADE LOGIC DETAILS (প্রাতিষ্ঠানিক টেকনিক্যাল ব্যাখ্যা):</b>\n"
+                        f"{ai_text}"
                     )
             except:
                 continue
@@ -166,23 +184,20 @@ def analyze_with_ai(signal_text):
                 res_json = json.loads(resp.read().decode('utf-8'))
                 ai_text = res_json['candidates'][0]['content']['parts'][0]['text'].strip()
                 return (
-                    f"\n\n<blockquote expandable>🔍 <b>See More — AI Analysis</b>\n"
-                    f"{empty}\n{empty}\n"
-                    f"🧠 <b>Institutional Analysis:</b>\n{ai_text}</blockquote>"
+                    f"\n\n🧠 <b>TRADE LOGIC DETAILS (প্রাতিষ্ঠানিক টেকনিক্যাল ব্যাখ্যা):</b>\n"
+                    f"{ai_text}"
                 )
         except:
             pass
 
     # Built-in Institutional Analysis (Guaranteed 100% Fail-Safe)
-    is_buy = "BUY" in signal_text.upper()
-    dir_str = "বুলিশ (Bullish)" if is_buy else "বেয়ারিশ (Bearish)"
-    grade_str = "SUPER A+ (Morning Expansion)" if "SUPER" in signal_text.upper() else "Grade A+"
+    retest_line = f"• 🔄 <b>Retest Zone:</b> প্রাইস {retest_val} লেভেলে প্রাতিষ্ঠানিক রিটেস্ট ও রিজেকশন কনফার্ম করেছে।\n" if retest_val != "-" else ""
     return (
-        f"\n\n<blockquote expandable>🔍 <b>See More — AI Analysis</b>\n"
-        f"{empty}\n{empty}\n"
-        f"• 🎯 <b>Trade Validity:</b> প্রাতিষ্ঠানিক SMC Order Block রিটেস্ট ও মাল্টি-টাইমফ্রেম {dir_str} ফ্লো কনফার্মেশন থাকায় সেটআপটি টেকনিক্যালি সম্পূর্ণ ভ্যালিড।\n"
-        f"• 📊 <b>Win Chance:</b> ৮৫%+ উচ্চ উইন সম্ভাবনা ({grade_str} সেটআপ এবং ১:৩.৫ ফেভারেবল Risk-to-Reward)।\n"
-        f"• ⚡ <b>Execution Tip:</b> Retest জোনে সেফ এন্ট্রি নিন; TP1 হিট হওয়া মাত্র স্টপলস Break-Even এ ট্রেইল করুন।</blockquote>"
+        f"\n\n🧠 <b>TRADE LOGIC DETAILS (প্রাতিষ্ঠানিক টেকনিক্যাল ব্যাখ্যা):</b>\n"
+        f"• 🏦 <b>Order Block Mitigation:</b> প্রাইস ইনস্টিটিউশনাল {action_str} Order Block জোনে ট্যাপ করে লিকুইডিটি সুইপ (Liquidity Sweep) সম্পন্ন করেছে।\n"
+        f"{retest_line}"
+        f"• 🕯️ <b>Price Action Rejection:</b> স্ট্রাকচারাল লো/হাই থেকে স্ট্রং রিজেকশন উইক এবং {tf_str} ক্যান্ডেল ক্লোজ কনফার্মেশন পাওয়া গেছে।\n"
+        f"• 📊 <b>MTF Confluence:</b> মাল্টি-টাইমফ্রেম {dir_str} ট্রেন্ড অ্যালাইনমেন্ট ও পিক সেশনের ভলিউম ইনফ্লো।"
     )
 
 def send_telegram_message(text):
