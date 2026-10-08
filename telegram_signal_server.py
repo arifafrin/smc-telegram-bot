@@ -95,21 +95,21 @@ def format_clean_signal(raw_text):
     action_text = "BUY NOW" if is_buy else "SELL NOW"
     sig_icon = "🌟" if is_super else ("🏆" if is_buy else "🔻")
     grade_text = "SUPER A+ MORNING EXPANSION" if is_super else ("A+" if is_aplus else "B+")
-    title_str = to_bold_sans(f"{grade_text} CONFIRMED {action_text}")
+    title_str = f"{grade_text} CONFIRMED {action_text}"
     
     div = "─────────────────────────────"
-    retest_line = f"🔄 <b>{to_bold_sans('Retest Zone:')} {retest}</b>\n" if retest != "-" else ""
+    retest_line = f"🔄 <b>RETEST ZONE:</b> {retest}\n" if retest != "-" else ""
     
     msg = (
         f"<b>{sig_icon} {title_str}</b>\n"
-        f"<b>Asset: {asset_display}</b>\n"
+        f"<b>ASSET:</b> {asset_display}\n"
         f"{div}\n"
-        f"🎯 <b>{to_bold_sans('Entry:')} {entry}</b>\n"
+        f"🎯 <b>ENTRY:</b> {entry}\n"
         f"{retest_line}"
-        f"🛑 <b>{to_bold_sans('Stop Loss:')} {sl_price}</b>\n\n"
-        f"🚀 <b>{to_bold_sans('Take Profit 1:')} {tp1_price} (1:2.0)</b>\n"
-        f"🚀 <b>{to_bold_sans('Take Profit 2:')} {tp2_price} (1:3.5 🔥)</b>\n"
-        f"🚀 <b>{to_bold_sans('Take Profit 3:')} {tp3} (1:5.0 🚀)</b>\n"
+        f"🛑 <b>STOP LOSS:</b> {sl_price}\n\n"
+        f"🚀 <b>TAKE PROFIT 1:</b> {tp1_price} (1:2.0)\n"
+        f"🚀 <b>TAKE PROFIT 2:</b> {tp2_price} (1:3.5 🔥)\n"
+        f"🚀 <b>TAKE PROFIT 3:</b> {tp3} (1:5.0 🚀)\n"
         f"{div}"
     )
     return msg
