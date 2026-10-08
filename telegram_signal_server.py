@@ -39,6 +39,7 @@ def format_clean_signal(raw_text):
     header = parts[0]
     
     is_buy = "BUY" in header.upper()
+    is_super = "SUPER" in header.upper()
     is_aplus = "A+" in header.upper()
     
     ticker = "XAUUSD"
@@ -61,26 +62,28 @@ def format_clean_signal(raw_text):
 
     asset_display = f"{asset_name} • {tf_tag}" if tf_tag else asset_name
 
-    entry = "-"
-    if "@" in header:
-        entry = header.split("@")[1].strip()
-        
-    sl = tp1 = tp2 = retest = "-"
+    entry = header.split("@")[1].strip() if "@" in header else "-"
+    sl_raw = tp1_raw = tp2_raw = retest = "-"
+
     for p in parts[1:]:
         if p.startswith("SL:"):
-            sl = p.replace("SL:", "").strip()
+            sl_raw = p.replace("SL:", "").strip()
         elif p.startswith("TP1:"):
-            tp1 = p.replace("TP1:", "").strip()
+            tp1_raw = p.replace("TP1:", "").strip()
         elif p.startswith("TP2:"):
-            tp2 = p.replace("TP2:", "").strip()
+            tp2_raw = p.replace("TP2:", "").strip()
         elif p.startswith("Retest:"):
             retest = p.replace("Retest:", "").strip()
+
+    sl_price = sl_raw.split()[0].strip() if sl_raw != "-" else "-"
+    tp1_price = tp1_raw.split()[0].strip() if tp1_raw != "-" else "-"
+    tp2_price = tp2_raw.split()[0].strip() if tp2_raw != "-" else "-"
 
     # Calculate TP3 (1:5.0)
     tp3 = "-"
     try:
         e_f = float(entry)
-        s_f = float(sl)
+        s_f = float(sl_price)
         risk_f = abs(e_f - s_f)
         if is_buy:
             tp3 = f"{e_f + risk_f * 5.0:.2f}"
@@ -89,9 +92,9 @@ def format_clean_signal(raw_text):
     except:
         pass
 
-    sig_icon = "🏆" if is_buy else "🔻"
     action_text = "BUY NOW" if is_buy else "SELL NOW"
-    grade_text = "A+" if is_aplus else "B+"
+    sig_icon = "🌟" if is_super else ("🏆" if is_buy else "🔻")
+    grade_text = "SUPER A+ MORNING EXPANSION" if is_super else ("A+" if is_aplus else "B+")
     title_str = f"{grade_text} CONFIRMED {action_text}"
     
     div = "─────────────────────────────"
@@ -102,11 +105,11 @@ def format_clean_signal(raw_text):
         f"<b>Asset: {asset_display}</b>\n"
         f"{div}\n"
         f"🎯 <b>Entry: {entry}</b>\n"
-        f"{retest_line}\n"
-        f"🛑 <b>Stop Loss: {sl}</b>\n\n"
-        f"🚀 <b>Take Profit 1: {tp1} (1:2.0)</b>\n"
-        f"🚀 <b>Take Profit 2: {tp2} (1:3.5)</b>\n"
-        f"🚀 <b>Take Profit 3: {tp3} (1:5.0)</b>\n"
+        f"{retest_line}"
+        f"🛑 <b>Stop Loss: {sl_price}</b>\n\n"
+        f"🚀 <b>Take Profit 1: {tp1_price} (1:2.0)</b>\n"
+        f"🚀 <b>Take Profit 2: {tp2_price} (1:3.5 🔥)</b>\n"
+        f"🚀 <b>Take Profit 3: {tp3} (1:5.0 🚀)</b>\n"
         f"{div}"
     )
     return msg
@@ -114,11 +117,14 @@ def format_clean_signal(raw_text):
 def analyze_with_ai(signal_text):
     """See More ক্লিক করলে বাংলায় শর্ট প্রাতিষ্ঠানিক ব্যাখ্যা খুলবে"""
     prompt = (
-        f"Act as an elite SMC/ICT institutional trader. "
-        f"In Bengali (বাংলায়), giving all trading terms in English "
-        f"(e.g., Order Block, Liquidity Sweep, FVG, Break-Even, Retest Zone, Stop Loss, Take Profit, CHoCH, Displacement), "
-        f"provide 2 or 3 short sharp bullet points under 45 words explaining institutional rationale and execution.\n\n"
-        f"Signal Data: {signal_text}"
+        f"Act as an elite SMC/ICT institutional analyst. "
+        f"A verified signal was just confirmed by our institutional indicator:\n{signal_text}\n\n"
+        f"In Bengali (বাংলায়), with key trading terms in English (e.g. Order Block, Liquidity Sweep, Retest, Breakout, Stop Loss, Risk-to-Reward), "
+        f"provide a crisp 3-bullet analysis strictly covering:\n"
+        f"• 🎯 Trade Validity: কেন এই ট্রেডটি টেকনিক্যালি ভ্যালিড (SMC Structure/Retest/Sweep কনফার্মেশন)।\n"
+        f"• 📊 Win Chance: উইন সম্ভাবনা ও রিস্ক-রিওয়ার্ড মূল্যায়ন (High Probability / Grade A+)।\n"
+        f"• ⚡ Execution Tip: ট্রেডারদের জন্য সেফ এন্ট্রি ও Break-Even ট্র্যাকিং টিপস।\n"
+        f"Keep total response concise and sharp (under 55 words)."
     )
 
     if QWEN_API_KEY:
@@ -129,14 +135,14 @@ def analyze_with_ai(signal_text):
         payload = {
             "model": "qwen-plus",
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 120
+            "max_tokens": 150
         }
         data = json.dumps(payload).encode('utf-8')
         headers = {"Content-Type": "application/json", "Authorization": f"Bearer {QWEN_API_KEY}"}
         for url in endpoints:
             try:
                 req = urllib.request.Request(url, data=data, headers=headers)
-                with urllib.request.urlopen(req, timeout=4) as resp:
+                with urllib.request.urlopen(req, timeout=5) as resp:
                     res_json = json.loads(resp.read().decode('utf-8'))
                     ai_text = res_json['choices'][0]['message']['content'].strip()
                     empty = '\u2800'
@@ -154,7 +160,7 @@ def analyze_with_ai(signal_text):
             payload = {"contents": [{"parts": [{"text": prompt}]}]}
             data = json.dumps(payload).encode('utf-8')
             req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(req, timeout=4) as resp:
+            with urllib.request.urlopen(req, timeout=5) as resp:
                 res_json = json.loads(resp.read().decode('utf-8'))
                 ai_text = res_json['candidates'][0]['content']['parts'][0]['text'].strip()
                 empty = '\u2800'
