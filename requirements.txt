@@ -1,1 +1,2 @@
-# Pure Python built-in standard library (No external pip dependencies needed)
+# Standard libraries used in telegram_signal_server.py
+# (urllib, http.server, json, os)
