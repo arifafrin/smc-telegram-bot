@@ -215,8 +215,64 @@ def send_telegram_message(text):
 
     return any_success
 
+LATEST_TRADE = None
+
+def extract_structured_trade(raw_text):
+    """Extract structured numerical parameters for MT5 automated execution"""
+    try:
+        parts = [p.strip() for p in raw_text.split("|")]
+        header = parts[0]
+        is_buy = "BUY" in header.upper()
+        is_super = "SUPER" in header.upper()
+        is_aplus = "A+" in header.upper()
+        grade = "SUPER A+" if is_super else ("A+" if is_aplus else "B+")
+        action = "BUY" if is_buy else "SELL"
+        
+        ticker = "XAUUSD"
+        if " on " in header and "@" in header:
+            ticker = header.split(" on ")[1].split("@")[0].strip()
+        elif " on " in header:
+            ticker = header.split(" on ")[1].strip()
+
+        if "(" in ticker:
+            ticker = ticker[:ticker.find("(")].strip()
+
+        entry_val = float(header.split("@")[1].strip()) if "@" in header else 0.0
+        sl_val = tp1_val = tp2_val = 0.0
+
+        for p in parts[1:]:
+            if p.startswith("SL:"):
+                sl_str = p.replace("SL:", "").strip().split()[0]
+                sl_val = float(sl_str)
+            elif p.startswith("TP1:"):
+                tp1_str = p.replace("TP1:", "").strip().split()[0]
+                tp1_val = float(tp1_str)
+            elif p.startswith("TP2:"):
+                tp2_str = p.replace("TP2:", "").strip().split()[0]
+                tp2_val = float(tp2_str)
+
+        risk = abs(entry_val - sl_val)
+        tp3_val = entry_val + risk * 5.0 if is_buy else entry_val - risk * 5.0
+
+        return {
+            "id": int(time.time() * 1000),
+            "ticker": ticker,
+            "action": action,
+            "grade": grade,
+            "entry": entry_val,
+            "sl": sl_val,
+            "tp1": tp1_val,
+            "tp2": tp2_val,
+            "tp3": tp3_val,
+            "time": time.strftime("%Y-%m-%d %H:%M:%S")
+        }
+    except Exception as e:
+        print(f"[ERROR parsing structured trade]: {e}")
+        return None
+
 class WebhookHandler(BaseHTTPRequestHandler):
     def do_POST(self):
+        global LATEST_TRADE
         content_length = int(self.headers.get('Content-Length', 0))
         raw_body = self.rfile.read(content_length).decode('utf-8')
         print(f"[RECEIVED WEBHOOK]: {raw_body}")
@@ -242,6 +298,11 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"status": "ignored"}).encode('utf-8'))
             return
 
+        trade_obj = extract_structured_trade(message_to_send)
+        if trade_obj:
+            LATEST_TRADE = trade_obj
+            print(f"[MT5 TRADE QUEUED]: {trade_obj['action']} {trade_obj['ticker']} Grade:{trade_obj['grade']} Entry:{trade_obj['entry']}")
+
         ai_block = analyze_with_ai(message_to_send)
 
         final_tg_msg = clean_table + ai_block
@@ -258,6 +319,13 @@ class WebhookHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        if self.path.startswith("/api/latest_trade"):
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(LATEST_TRADE or {}).encode('utf-8'))
+            return
+
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
