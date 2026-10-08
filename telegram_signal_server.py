@@ -117,6 +117,13 @@ def format_clean_signal(raw_text):
 
 def analyze_with_ai(signal_text):
     """ট্রেডের প্রাতিষ্ঠানিক লজিক বাংলায় ও ট্রেডিং টার্মগুলো ইংরেজিতে সুন্দরভাবে ব্যাখ্যা করে"""
+    if "BREAKEVEN" in signal_text.upper():
+        return (
+            f"\n\n🧠 <b>SMART RISK SHIELD (বাংলা ব্যাখ্যা):</b>\n"
+            f"• 🛡️ <b>Reversal Defense:</b> অপোজিট Order Block বা Trend Flip ডিটেক্ট হওয়ায় রানিং প্রফিট সুরক্ষিত রাখতে রোবট তাৎক্ষণিকভাবে SL-কে এন্ট্রি প্রাইসে (Break-Even) লক করার নির্দেশ পেয়েছে।\n"
+            f"• 🔒 <b>Profit Condition:</b> পজিশনটি কারেন্টলি প্রফিটে থাকলে ব্রেক-ইভেন লক হবে, লসে থাকলে স্ট্রাকচারাল SL অক্ষত থাকবে।"
+        )
+
     is_buy = "BUY" in signal_text.upper()
     action_str = "BUY" if is_buy else "SELL"
     dir_str = "Bullish" if is_buy else "Bearish"
