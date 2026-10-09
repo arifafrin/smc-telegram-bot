@@ -1,8 +1,19 @@
+"""
+================================================================================
+  SMC TRADINGVIEW CLOUD WEBHOOK BRIDGE (ULTRA-FAST ZERO-TIMEOUT VERSION)
+  UPDATED: 2026-10-09 12:12 PM BD TIME
+  • Immediate <15ms 200 OK response to TradingView (Prevents 3-second timeout!)
+  • Background Async AI analysis & Telegram notifications
+  • Instant MT5 trade parameter queue
+================================================================================
+"""
+
 import os
 import time
 import json
 import urllib.request
 import urllib.parse
+import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # ═══════════════════════════════════════════════════════════════
@@ -326,15 +337,22 @@ class WebhookHandler(BaseHTTPRequestHandler):
             LATEST_TRADE = trade_obj
             print(f"[MT5 TRADE QUEUED]: {trade_obj['action']} {trade_obj['ticker']} Grade:{trade_obj['grade']} Entry:{trade_obj['entry']}")
 
-        ai_block = analyze_with_ai(message_to_send)
-
-        final_tg_msg = clean_table + ai_block
-        success = send_telegram_message(final_tg_msg)
-
-        self.send_response(200 if success else 500)
+        # Respond to TradingView IMMEDIATELY (<15ms) to prevent timeout
+        self.send_response(200)
         self.send_header('Content-type', 'application/json')
         self.end_headers()
-        self.wfile.write(json.dumps({"status": "ok" if success else "failed"}).encode('utf-8'))
+        self.wfile.write(json.dumps({"status": "received", "queued": bool(trade_obj)}).encode('utf-8'))
+
+        # Run AI analysis & Telegram notification in background thread
+        def notify_worker(msg, tbl):
+            try:
+                ai_block = analyze_with_ai(msg)
+                final_tg_msg = tbl + ai_block
+                send_telegram_message(final_tg_msg)
+            except Exception as e:
+                print(f"[ASYNC NOTIFY ERROR]: {e}")
+
+        threading.Thread(target=notify_worker, args=(message_to_send, clean_table), daemon=True).start()
 
     def do_HEAD(self):
         self.send_response(200)
